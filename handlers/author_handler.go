@@ -2,32 +2,34 @@ package handlers
 
 import (
 	"Bookstore/models"
-	"encoding/json"
 	"net/http"
+
+	"github.com/gin-gonic/gin"
 )
 
-var Authors = make(map[int]models.Author)
-var NextAuthorID = 1
-
-func GetAuthors(w http.ResponseWriter, r *http.Request) {
-	var list []models.Author
-
-	for _, a := range Authors {
-		list = append(list, a)
-	}
-
-	json.NewEncoder(w).Encode(list)
+var users = []models.Author{
+	{ID: 1, Name: "Nursayat"},
+	{ID: 2, Name: "Didar"},
+	{ID: 3, Name: "Aslanbek"},
 }
 
-func CreateAuthor(w http.ResponseWriter, r *http.Request) {
-	var a models.Author
+func GetAuthors(c *gin.Context) {
+	c.JSON(http.StatusOK, users)
 
-	json.NewDecoder(r.Body).Decode(&a)
+}
 
-	a.ID = NextAuthorID
-	NextAuthorID++
+func AddAuthor(c *gin.Context) {
+	var user models.Author
 
-	Authors[a.ID] = a
-
-	json.NewEncoder(w).Encode(a)
+	if err := c.ShouldBindJSON(&user); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	if user.Name == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Name is required"})
+		return
+	}
+	user.ID = len(users) + 1
+	users = append(users, user)
+	c.JSON(http.StatusCreated, user)
 }

@@ -2,63 +2,114 @@ package handlers
 
 import (
 	"Bookstore/models"
-	"encoding/json"
+	"fmt"
 	"net/http"
 	"strconv"
-	"strings"
+
+	"github.com/gin-gonic/gin"
 )
 
-var Books = make(map[int]models.Book)
-var NextBookID = 1
+var boks = []models.Book{
+	{ID: 1, Title: "Interstellar", AuthorID: 1, CategoryID: 2, Price: 2500},
+	{ID: 2, Title: "Django unchained", AuthorID: 2, CategoryID: 3, Price: 5700},
+	{ID: 3, Title: "Spider-man", AuthorID: 3, CategoryID: 1, Price: 8000}}
 
-func GetBooks(w http.ResponseWriter, r *http.Request) {
-	var list []models.Book
+func GetBooks(c *gin.Context) {
+	categoryIDStr := c.Query("category_id")
+	firstPg := c.DefaultQuery("L", "1")
+	lastPg := c.DefaultQuery("R", "2")
 
-	for _, b := range Books {
-		list = append(list, b)
+	L, _ := strconv.Atoi(firstPg)
+	R, _ := strconv.Atoi(lastPg)
+
+	var filteredBooks []models.Book
+	for _, b := range boks {
+		if categoryIDStr == "" || fmt.Sprint(b.CategoryID) == categoryIDStr {
+			filteredBooks = append(filteredBooks, b)
+		}
 	}
 
-	json.NewEncoder(w).Encode(list)
+	startIndex := (L - 1) * R
+	endIndex := startIndex + R
+
+	if startIndex >= len(filteredBooks) {
+		c.JSON(http.StatusOK, []models.Book{})
+		return
+	}
+
+	if endIndex > len(filteredBooks) {
+		endIndex = len(filteredBooks)
+	}
+
+	result := filteredBooks[startIndex:endIndex]
+	c.JSON(http.StatusOK, result)
+}
+func GetBookByID(c *gin.Context) {
+	id := c.Param("id")
+
+	for _, b := range boks {
+		if fmt.Sprint(b.ID) == id {
+			c.JSON(http.StatusOK, b)
+			return
+		}
+	}
+
+	c.JSON(http.StatusNotFound, gin.H{"error": "book not found"})
 }
 
-func CreateBook(w http.ResponseWriter, r *http.Request) {
-	var b models.Book
+func CreateBook(c *gin.Context) {
+	var book models.Book
+	if err := c.ShouldBindJSON(&book); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
 
-	json.NewDecoder(r.Body).Decode(&b)
+	if book.Title == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Title empty"})
+		return
+	}
 
-	b.ID = NextBookID
-	NextBookID++
+	if book.Price <= 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Price must be greater than 0"})
+		return
+	}
 
-	Books[b.ID] = b
-
-	json.NewEncoder(w).Encode(b)
+	book.ID = len(boks) + 1
+	boks = append(boks, book)
+	c.JSON(http.StatusCreated, book)
 }
 
-func GetBookByID(w http.ResponseWriter, r *http.Request) {
-	idStr := strings.TrimPrefix(r.URL.Path, "/books/")
-	id, _ := strconv.Atoi(idStr)
+func UpdateBook(c *gin.Context) {
+	id := c.Param("id")
 
-	b := Books[id]
+	var updatedBook models.Book
+	if err := c.ShouldBindJSON(&updatedBook); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
 
-	json.NewEncoder(w).Encode(b)
+	for i, b := range boks {
+		if fmt.Sprint(b.ID) == id {
+			updatedBook.ID = b.ID
+			boks[i] = updatedBook
+			c.JSON(http.StatusOK, updatedBook)
+			return
+		}
+	}
+
+	c.JSON(http.StatusNotFound, gin.H{"error": "book not found"})
 }
 
-func UpdateBook(w http.ResponseWriter, r *http.Request) {
-	idStr := strings.TrimPrefix(r.URL.Path, "/books/")
-	id, _ := strconv.Atoi(idStr)
+func DeleteBook(c *gin.Context) {
+	id := c.Param("id")
 
-	var b models.Book
-	json.NewDecoder(r.Body).Decode(&b)
+	for i, b := range boks {
+		if fmt.Sprint(b.ID) == id {
+			boks = append(boks[:i], boks[i+1:]...)
+			c.JSON(http.StatusOK, gin.H{"message": "book deleted"})
+			return
+		}
+	}
 
-	b.ID = id
-	Books[id] = b
-
-	json.NewEncoder(w).Encode(b)
-}
-
-func DeleteBook(w http.ResponseWriter, r *http.Request) {
-	idStr := strings.TrimPrefix(r.URL.Path, "/books/")
-	id, _ := strconv.Atoi(idStr)
-
-	delete(Books, id)
+	c.JSON(http.StatusNotFound, gin.H{"error": "book not found"})
 }

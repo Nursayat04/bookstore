@@ -2,32 +2,35 @@ package handlers
 
 import (
 	"Bookstore/models"
-	"encoding/json"
 	"net/http"
+
+	"github.com/gin-gonic/gin"
 )
 
-var Categories = make(map[int]models.Category)
-var NextCategoryID = 1
-
-func GetCategories(w http.ResponseWriter, r *http.Request) {
-	var list []models.Category
-
-	for _, c := range Categories {
-		list = append(list, c)
-	}
-
-	json.NewEncoder(w).Encode(list)
+var categories = []models.Category{
+	{ID: 1, Name: "Fantasy"},
+	{ID: 2, Name: "Science"},
+	{ID: 3, Name: "Action"},
 }
 
-func CreateCategory(w http.ResponseWriter, r *http.Request) {
-	var c models.Category
+func GetCategories(c *gin.Context) {
+	c.JSON(http.StatusOK, categories)
+}
 
-	json.NewDecoder(r.Body).Decode(&c)
+func CreateCategory(c *gin.Context) {
+	var category models.Category
 
-	c.ID = NextCategoryID
-	NextCategoryID++
+	if err := c.ShouldBindJSON(&category); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
 
-	Categories[c.ID] = c
+	if category.Name == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Category name is required"})
+		return
+	}
 
-	json.NewEncoder(w).Encode(c)
+	category.ID = len(categories) + 1
+	categories = append(categories, category)
+	c.JSON(http.StatusCreated, category)
 }

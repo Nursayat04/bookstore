@@ -2,46 +2,21 @@ package main
 
 import (
 	"Bookstore/handlers"
-	"fmt"
-	"net/http"
+
+	"github.com/gin-gonic/gin"
 )
 
 func main() {
+	r := gin.Default()
+	r.GET("/users", handlers.GetAuthors)
+	r.POST("/users", handlers.AddAuthor)
 
-	http.HandleFunc("/authors", func(w http.ResponseWriter, r *http.Request) {
-		if r.Method == "GET" {
-			handlers.GetAuthors(w, r)
-		} else if r.Method == "POST" {
-			handlers.CreateAuthor(w, r)
-		}
-	})
+	r.GET("/books", handlers.GetBooks)
+	r.POST("/books", handlers.CreateBook)
+	r.PUT("/books/:id", handlers.UpdateBook)
+	r.GET("/books/:id", handlers.GetBookByID)
+	r.DELETE("/books/:id", handlers.DeleteBook)
 
-	http.HandleFunc("/categories", func(w http.ResponseWriter, r *http.Request) {
-		if r.Method == "GET" {
-			handlers.GetCategories(w, r)
-		} else if r.Method == "POST" {
-			handlers.CreateCategory(w, r)
-		}
-	})
-
-	http.HandleFunc("/books", func(w http.ResponseWriter, r *http.Request) {
-		if r.Method == "GET" {
-			handlers.GetBooks(w, r)
-		} else if r.Method == "POST" {
-			handlers.CreateBook(w, r)
-		}
-	})
-
-	http.HandleFunc("/books/", func(w http.ResponseWriter, r *http.Request) {
-		if r.Method == "GET" {
-			handlers.GetBookByID(w, r)
-		} else if r.Method == "PUT" {
-			handlers.UpdateBook(w, r)
-		} else if r.Method == "DELETE" {
-			handlers.DeleteBook(w, r)
-		}
-	})
-
-	fmt.Println("Server started on port 8080")
-	http.ListenAndServe(":8080", nil)
+	r.GET("/categories", handlers.GetCategories)
+	r.POST("/categories", handlers.CreateCategory)
 }

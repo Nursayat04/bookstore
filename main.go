@@ -19,4 +19,5 @@ func main() {
 
 	r.GET("/categories", handlers.GetCategories)
 	r.POST("/categories", handlers.CreateCategory)
+	r.Run("localhost:8080")
 }

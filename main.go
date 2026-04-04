@@ -2,46 +2,32 @@ package main
 
 import (
 	"Bookstore/handlers"
-	"fmt"
+	"github.com/gorilla/mux"
+	"log"
 	"net/http"
 )
 
 func main() {
+	r := mux.NewRouter()
 
-	http.HandleFunc("/authors", func(w http.ResponseWriter, r *http.Request) {
-		if r.Method == "GET" {
-			handlers.GetAuthors(w, r)
-		} else if r.Method == "POST" {
-			handlers.CreateAuthor(w, r)
-		}
-	})
+	r.HandleFunc("/authors", handlers.GetAuthors).Methods("GET")
+	r.HandleFunc("/authors", handlers.CreateAuthor).Methods("POST")
+	r.HandleFunc("/authors/{id}", handlers.GetAuthorByID).Methods("GET")
+	r.HandleFunc("/authors/{id}", handlers.UpdateAuthor).Methods("PUT")
+	r.HandleFunc("/authors/{id}", handlers.DeleteAuthor).Methods("DELETE")
 
-	http.HandleFunc("/categories", func(w http.ResponseWriter, r *http.Request) {
-		if r.Method == "GET" {
-			handlers.GetCategories(w, r)
-		} else if r.Method == "POST" {
-			handlers.CreateCategory(w, r)
-		}
-	})
+	r.HandleFunc("/categories", handlers.GetCategories).Methods("GET")
+	r.HandleFunc("/categories", handlers.CreateCategory).Methods("POST")
+	r.HandleFunc("/categories/{id}", handlers.GetCategoryByID).Methods("GET")
+	r.HandleFunc("/categories/{id}", handlers.UpdateCategory).Methods("PUT")
+	r.HandleFunc("/categories/{id}", handlers.DeleteCategory).Methods("DELETE")
 
-	http.HandleFunc("/books", func(w http.ResponseWriter, r *http.Request) {
-		if r.Method == "GET" {
-			handlers.GetBooks(w, r)
-		} else if r.Method == "POST" {
-			handlers.CreateBook(w, r)
-		}
-	})
+	r.HandleFunc("/books", handlers.GetBooks).Methods("GET")
+	r.HandleFunc("/books", handlers.CreateBook).Methods("POST")
+	r.HandleFunc("/books/{id}", handlers.GetBookByID).Methods("GET")
+	r.HandleFunc("/books/{id}", handlers.UpdateBook).Methods("PUT")
+	r.HandleFunc("/books/{id}", handlers.DeleteBook).Methods("DELETE")
 
-	http.HandleFunc("/books/", func(w http.ResponseWriter, r *http.Request) {
-		if r.Method == "GET" {
-			handlers.GetBookByID(w, r)
-		} else if r.Method == "PUT" {
-			handlers.UpdateBook(w, r)
-		} else if r.Method == "DELETE" {
-			handlers.DeleteBook(w, r)
-		}
-	})
-
-	fmt.Println("Server started on port 8080")
-	http.ListenAndServe(":8080", nil)
+	log.Println("Server running on port 8080")
+	log.Fatal(http.ListenAndServe(":8080", r))
 }

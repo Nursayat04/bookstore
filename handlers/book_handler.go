@@ -3,62 +3,62 @@ package handlers
 import (
 	"Bookstore/models"
 	"encoding/json"
+	"github.com/gorilla/mux"
 	"net/http"
 	"strconv"
-	"strings"
 )
 
 var Books = make(map[int]models.Book)
 var NextBookID = 1
 
 func GetBooks(w http.ResponseWriter, r *http.Request) {
-	var list []models.Book
+	var bookList []models.Book
 
-	for _, b := range Books {
-		list = append(list, b)
+	for _, book := range Books {
+		bookList = append(bookList, book)
 	}
 
-	json.NewEncoder(w).Encode(list)
+	json.NewEncoder(w).Encode(bookList)
 }
 
 func CreateBook(w http.ResponseWriter, r *http.Request) {
-	var b models.Book
+	var book models.Book
 
-	json.NewDecoder(r.Body).Decode(&b)
+	json.NewDecoder(r.Body).Decode(&book)
 
-	b.ID = NextBookID
+	book.ID = NextBookID
 	NextBookID++
 
-	Books[b.ID] = b
+	Books[book.ID] = book
 
-	json.NewEncoder(w).Encode(b)
-}
-
-func GetBookByID(w http.ResponseWriter, r *http.Request) {
-	idStr := strings.TrimPrefix(r.URL.Path, "/books/")
-	id, _ := strconv.Atoi(idStr)
-
-	b := Books[id]
-
-	json.NewEncoder(w).Encode(b)
+	json.NewEncoder(w).Encode(book)
 }
 
 func UpdateBook(w http.ResponseWriter, r *http.Request) {
-	idStr := strings.TrimPrefix(r.URL.Path, "/books/")
-	id, _ := strconv.Atoi(idStr)
+	params := mux.Vars(r)
+	id, _ := strconv.Atoi(params["id"])
 
-	var b models.Book
-	json.NewDecoder(r.Body).Decode(&b)
+	var updatedBook models.Book
+	json.NewDecoder(r.Body).Decode(&updatedBook)
 
-	b.ID = id
-	Books[id] = b
+	updatedBook.ID = id
+	Books[id] = updatedBook
 
-	json.NewEncoder(w).Encode(b)
+	json.NewEncoder(w).Encode(updatedBook)
 }
 
 func DeleteBook(w http.ResponseWriter, r *http.Request) {
-	idStr := strings.TrimPrefix(r.URL.Path, "/books/")
-	id, _ := strconv.Atoi(idStr)
+	params := mux.Vars(r)
+	id, _ := strconv.Atoi(params["id"])
 
 	delete(Books, id)
+}
+
+func GetBookByID(w http.ResponseWriter, r *http.Request) {
+	params := mux.Vars(r)
+	id, _ := strconv.Atoi(params["id"])
+
+	book := Books[id]
+
+	json.NewEncoder(w).Encode(book)
 }

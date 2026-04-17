@@ -1,115 +1,103 @@
 package handlers
 
 import (
+	"Bookstore/config"
 	"Bookstore/models"
-	"fmt"
+	"math"
 	"net/http"
 	"strconv"
 
 	"github.com/gin-gonic/gin"
 )
 
-var boks = []models.Book{
-	{ID: 1, Title: "Interstellar", AuthorID: 1, CategoryID: 2, Price: 2500},
-	{ID: 2, Title: "Django unchained", AuthorID: 2, CategoryID: 3, Price: 5700},
-	{ID: 3, Title: "Spider-man", AuthorID: 3, CategoryID: 1, Price: 8000}}
-
 func GetBooks(c *gin.Context) {
-	categoryIDStr := c.Query("category_id")
-	firstPg := c.DefaultQuery("L", "1")
-	lastPg := c.DefaultQuery("R", "2")
+	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
+	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "10"))
+	offset := (page - 1) * limit
 
-	L, _ := strconv.Atoi(firstPg)
-	R, _ := strconv.Atoi(lastPg)
+	var books []models.Book
+	var total int64
 
-	var filteredBooks []models.Book
-	for _, b := range boks {
-		if categoryIDStr == "" || fmt.Sprint(b.CategoryID) == categoryIDStr {
-			filteredBooks = append(filteredBooks, b)
-		}
-	}
+	config.DB.Model(&models.Book{}).Count(&total)
+	result := config.DB.Model(&models.Book{}).
+		Select("id, title, author_id, category_id, price").
+		Limit(limit).Offset(offset).
+		Find(&books)
 
-	startIndex := (L - 1) * R
-	endIndex := startIndex + R
-
-	if startIndex >= len(filteredBooks) {
-		c.JSON(http.StatusOK, []models.Book{})
+	if result.Error != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch books"})
 		return
 	}
 
-	if endIndex > len(filteredBooks) {
-		endIndex = len(filteredBooks)
-	}
-
-	result := filteredBooks[startIndex:endIndex]
-	c.JSON(http.StatusOK, result)
+	c.JSON(http.StatusOK, gin.H{
+		"data":       books,
+		"total":      total,
+		"page":       page,
+		"limit":      limit,
+		"totalPages": int(math.Ceil(float64(total) / float64(limit))),
+	})
 }
+
 func GetBookByID(c *gin.Context) {
 	id := c.Param("id")
-
-	for _, b := range boks {
-		if fmt.Sprint(b.ID) == id {
-			c.JSON(http.StatusOK, b)
-			return
-		}
+	var book models.Book
+	result := config.DB.Preload("Author").Preload("Category").First(&book, id)
+	if result.Error != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Book not found"})
+		return
 	}
-
-	c.JSON(http.StatusNotFound, gin.H{"error": "book not found"})
+	c.JSON(http.StatusOK, book)
 }
 
 func CreateBook(c *gin.Context) {
-	var book models.Book
-	if err := c.ShouldBindJSON(&book); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+	var newBook models.Book
+	if err := c.ShouldBindJSON(&newBook); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid input"})
 		return
 	}
-
-	if book.Title == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Title empty"})
+	if newBook.Title == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Book title is required"})
 		return
 	}
-
-	if book.Price <= 0 {
+	if newBook.Price <= 0 {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Price must be greater than 0"})
 		return
 	}
-
-	book.ID = len(boks) + 1
-	boks = append(boks, book)
-	c.JSON(http.StatusCreated, book)
+	result := config.DB.Create(&newBook)
+	if result.Error != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to add book"})
+		return
+	}
+	config.DB.Preload("Author").Preload("Category").First(&newBook, newBook.ID)
+	c.JSON(http.StatusCreated, newBook)
 }
 
 func UpdateBook(c *gin.Context) {
 	id := c.Param("id")
-
-	var updatedBook models.Book
-	if err := c.ShouldBindJSON(&updatedBook); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+	var book models.Book
+	if err := config.DB.First(&book, id).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Book not found"})
 		return
 	}
-
-	for i, b := range boks {
-		if fmt.Sprint(b.ID) == id {
-			updatedBook.ID = b.ID
-			boks[i] = updatedBook
-			c.JSON(http.StatusOK, updatedBook)
-			return
-		}
+	if err := c.ShouldBindJSON(&book); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid input"})
+		return
 	}
-
-	c.JSON(http.StatusNotFound, gin.H{"error": "book not found"})
+	result := config.DB.Save(&book)
+	if result.Error != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update book"})
+		return
+	}
+	config.DB.Preload("Author").Preload("Category").First(&book, id)
+	c.JSON(http.StatusOK, book)
 }
 
 func DeleteBook(c *gin.Context) {
 	id := c.Param("id")
-
-	for i, b := range boks {
-		if fmt.Sprint(b.ID) == id {
-			boks = append(boks[:i], boks[i+1:]...)
-			c.JSON(http.StatusOK, gin.H{"message": "book deleted"})
-			return
-		}
+	result := config.DB.Delete(&models.Book{}, id)
+	if result.RowsAffected == 0 {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Book not found"})
+		return
 	}
-
-	c.JSON(http.StatusNotFound, gin.H{"error": "book not found"})
+	c.JSON(http.StatusOK, gin.H{"message": "Book deleted successfully"})
 }

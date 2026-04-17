@@ -1,36 +1,37 @@
 package handlers
 
 import (
+	"Bookstore/config"
 	"Bookstore/models"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
 )
 
-var categories = []models.Category{
-	{ID: 1, Name: "Fantasy"},
-	{ID: 2, Name: "Science"},
-	{ID: 3, Name: "Action"},
-}
-
 func GetCategories(c *gin.Context) {
+	var categories []models.Category
+	result := config.DB.Find(&categories)
+	if result.Error != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch categories"})
+		return
+	}
 	c.JSON(http.StatusOK, categories)
 }
 
-func CreateCategory(c *gin.Context) {
-	var category models.Category
-
-	if err := c.ShouldBindJSON(&category); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+func AddCategory(c *gin.Context) {
+	var newCategory models.Category
+	if err := c.ShouldBindJSON(&newCategory); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid input"})
 		return
 	}
-
-	if category.Name == "" {
+	if newCategory.Name == "" {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Category name is required"})
 		return
 	}
-
-	category.ID = len(categories) + 1
-	categories = append(categories, category)
-	c.JSON(http.StatusCreated, category)
+	result := config.DB.Create(&newCategory)
+	if result.Error != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to add category"})
+		return
+	}
+	c.JSON(http.StatusCreated, newCategory)
 }
